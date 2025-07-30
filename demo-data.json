@@ -1,0 +1,109 @@
+{
+  "path": "/Users/demo/Documents",
+  "items": [
+    {
+      "name": "Work",
+      "path": "/Users/demo/Documents/Work",
+      "size": 2048576000,
+      "type": "directory",
+      "modified": "2024-01-15T10:30:00.000Z",
+      "created": "2024-01-01T09:00:00.000Z",
+      "children": [
+        {
+          "name": "presentation.pptx",
+          "path": "/Users/demo/Documents/Work/presentation.pptx",
+          "size": 15728640,
+          "type": "file",
+          "extension": ".pptx",
+          "modified": "2024-01-15T10:30:00.000Z",
+          "created": "2024-01-15T10:30:00.000Z"
+        },
+        {
+          "name": "report.pdf",
+          "path": "/Users/demo/Documents/Work/report.pdf",
+          "size": 5242880,
+          "type": "file",
+          "extension": ".pdf",
+          "modified": "2024-01-14T16:45:00.000Z",
+          "created": "2024-01-14T16:45:00.000Z"
+        }
+      ]
+    },
+    {
+      "name": "Photos",
+      "path": "/Users/demo/Documents/Photos",
+      "size": 10737418240,
+      "type": "directory",
+      "modified": "2024-01-10T14:20:00.000Z",
+      "created": "2024-01-01T09:00:00.000Z",
+      "children": [
+        {
+          "name": "vacation.jpg",
+          "path": "/Users/demo/Documents/Photos/vacation.jpg",
+          "size": 3145728,
+          "type": "file",
+          "extension": ".jpg",
+          "modified": "2024-01-10T14:20:00.000Z",
+          "created": "2024-01-10T14:20:00.000Z"
+        },
+        {
+          "name": "family.png",
+          "path": "/Users/demo/Documents/Photos/family.png",
+          "size": 2097152,
+          "type": "file",
+          "extension": ".png",
+          "modified": "2024-01-09T11:15:00.000Z",
+          "created": "2024-01-09T11:15:00.000Z"
+        }
+      ]
+    },
+    {
+      "name": "Downloads",
+      "path": "/Users/demo/Documents/Downloads",
+      "size": 5368709120,
+      "type": "directory",
+      "modified": "2024-01-12T08:30:00.000Z",
+      "created": "2024-01-01T09:00:00.000Z",
+      "children": [
+        {
+          "name": "movie.mp4",
+          "path": "/Users/demo/Documents/Downloads/movie.mp4",
+          "size": 5242880000,
+          "type": "file",
+          "extension": ".mp4",
+          "modified": "2024-01-12T08:30:00.000Z",
+          "created": "2024-01-12T08:30:00.000Z"
+        },
+        {
+          "name": "archive.zip",
+          "path": "/Users/demo/Documents/Downloads/archive.zip",
+          "size": 125829120,
+          "type": "file",
+          "extension": ".zip",
+          "modified": "2024-01-11T15:45:00.000Z",
+          "created": "2024-01-11T15:45:00.000Z"
+        }
+      ]
+    },
+    {
+      "name": "old-backup.tar.gz",
+      "path": "/Users/demo/Documents/old-backup.tar.gz",
+      "size": 2147483648,
+      "type": "file",
+      "extension": ".tar.gz",
+      "modified": "2023-11-15T12:00:00.000Z",
+      "created": "2023-11-15T12:00:00.000Z"
+    },
+    {
+      "name": "script.js",
+      "path": "/Users/demo/Documents/script.js",
+      "size": 1024,
+      "type": "file",
+      "extension": ".js",
+      "modified": "2024-01-13T09:20:00.000Z",
+      "created": "2024-01-13T09:20:00.000Z"
+    }
+  ],
+  "totalSize": 18153472000,
+  "itemCount": 5
+}
