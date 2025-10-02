@@ -47,7 +47,7 @@
     "eslint-config-next": "15.4.5",
     "next": "^14.0.0",
     "playwright": "^1.54.1",
-    "typescript": "^5.0.0",
+    "typescript": "^5.9.3",
     "wait-on": "^7.0.0"
   },
   "dependencies": {
