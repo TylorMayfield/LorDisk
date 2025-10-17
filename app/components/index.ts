@@ -29,4 +29,6 @@ export { Header } from "./Header";
 export { Sidebar } from "./Sidebar";
 export { Dashboard } from "./Dashboard";
 export { LoadingSpinner } from "./LoadingSpinner";
-export { ThemeProvider } from "./ThemeProvider";
+
+// Theme provider
+export { ModernThemeProvider as ThemeProvider } from "./ModernThemeProvider";

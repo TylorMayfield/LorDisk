@@ -9,6 +9,15 @@ const nextConfig = {
   // Add experimental features for better performance
   experimental: {
     optimizeCss: true,
+    // Remove problematic Turbopack configuration that's causing runtime errors
+    // turbo: {
+    //   rules: {
+    //     '*.svg': {
+    //       loaders: ['@svgr/webpack'],
+    //       as: '*.js',
+    //     },
+    //   },
+    // },
   },
   // Configure for Electron
   webpack: (config, { isServer }) => {

@@ -73,6 +73,12 @@ export async function mockElectronAPI(
         totalSize: 0,
         itemCount: 0,
       }),
+      scanDirectoryStaggered: async () => ({
+        path: "/test/path",
+        items: [],
+        totalSize: 0,
+        itemCount: 0,
+      }),
       rescanDirectory: async () => ({
         path: "/test/path",
         items: [],
@@ -111,7 +117,12 @@ export async function mockElectronAPI(
         scannedDirectories: 0,
         totalItems: 0,
         isScanning: false,
+        phase: "complete",
       }),
+      onScanProgressUpdate: (callback: any) => {},
+      onImmediateScanResults: (callback: any) => {},
+      onDirectoryScanUpdate: (callback: any) => {},
+      removeAllListeners: (channel: string) => {},
       // Override with custom implementations
       ...overrides,
     };

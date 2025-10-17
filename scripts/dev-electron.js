@@ -62,9 +62,10 @@ async function startElectron() {
   console.log(`Starting Electron with port ${port}`);
 
   // Start Electron
-  const electron = spawn("electron", ["."], {
+  const electron = spawn("node_modules\\.bin\\electron.cmd", ["."], {
     stdio: "inherit",
     env: process.env,
+    shell: true,
   });
 
   electron.on("close", (code) => {

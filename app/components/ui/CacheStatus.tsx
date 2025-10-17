@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Database, RefreshCw, Trash2, Clock } from "lucide-react";
 
 interface CacheStatusProps {
@@ -20,11 +20,7 @@ export function CacheStatus({ rootPath, onRefresh }: CacheStatusProps) {
   const [cacheSize, setCacheSize] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    loadCacheStats();
-  }, [rootPath]);
-
-  const loadCacheStats = async () => {
+  const loadCacheStats = useCallback(async () => {
     try {
       setIsLoading(true);
       const [statsData, size] = await Promise.all([
@@ -38,7 +34,11 @@ export function CacheStatus({ rootPath, onRefresh }: CacheStatusProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [rootPath]);
+
+  useEffect(() => {
+    loadCacheStats();
+  }, [rootPath, loadCacheStats]);
 
   const handleClearCache = async () => {
     if (

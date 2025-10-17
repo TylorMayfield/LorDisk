@@ -28,6 +28,21 @@ declare global {
         totalSize: number;
         itemCount: number;
       }>;
+      scanDirectoryStaggered: (path: string, options?: any) => Promise<{
+        path: string;
+        items: Array<{
+          name: string;
+          path: string;
+          size: number;
+          type: "file" | "directory";
+          extension?: string;
+          modified: Date;
+          created: Date;
+          children?: any[];
+        }>;
+        totalSize: number;
+        itemCount: number;
+      }>;
       rescanDirectory: (path: string) => Promise<{
         path: string;
         items: Array<{
@@ -49,7 +64,14 @@ declare global {
         scannedDirectories: number;
         totalItems: number;
         isScanning: boolean;
+        phase?: string;
       }>;
+      
+      // Event listeners for staggered scanning
+      onScanProgressUpdate: (callback: (data: any) => void) => void;
+      onImmediateScanResults: (callback: (data: any) => void) => void;
+      onDirectoryScanUpdate: (callback: (data: any) => void) => void;
+      removeAllListeners: (channel: string) => void;
 
       // File operations
       deleteFile: (

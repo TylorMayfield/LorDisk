@@ -1,169 +1,80 @@
-const sqlite3 = require("sqlite3");
-const { open } = require("sqlite");
+const fs = require("fs").promises;
 const path = require("path");
 
 class FileSystemCache {
   constructor() {
-    this.db = null;
-    this.dbPath = null;
+    this.cacheDir = null;
   }
 
   async initialize() {
     try {
-      // Store database in user data directory
+      // Store cache in user data directory
       const { app } = require("electron");
       const userDataPath = app.getPath("userData");
-      this.dbPath = path.join(userDataPath, "lordisk_cache.db");
+      this.cacheDir = path.join(userDataPath, "lordisk_cache");
 
-      this.db = await open({
-        filename: this.dbPath,
-        driver: sqlite3.Database,
-      });
+      // Create cache directory if it doesn't exist
+      try {
+        await fs.mkdir(this.cacheDir, { recursive: true });
+      } catch (error) {
+        // Directory might already exist
+      }
 
-      // Create tables if they don't exist
-      await this.createTables();
-
-      // Create indexes for better performance
-      await this.createIndexes();
-
-      console.log("Database initialized successfully");
+      console.log("File cache initialized successfully");
     } catch (error) {
-      console.error("Failed to initialize database:", error);
+      console.error("Failed to initialize file cache:", error);
       throw error;
     }
   }
 
-  async createTables() {
-    if (!this.db) throw new Error("Database not initialized");
-
-    // Files table
-    await this.db.exec(`
-      CREATE TABLE IF NOT EXISTS files (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        path TEXT UNIQUE NOT NULL,
-        name TEXT NOT NULL,
-        size INTEGER NOT NULL,
-        type TEXT NOT NULL CHECK(type IN ('file', 'directory')),
-        extension TEXT,
-        modified DATETIME NOT NULL,
-        created DATETIME NOT NULL,
-        parent_path TEXT,
-        scan_timestamp DATETIME NOT NULL,
-        FOREIGN KEY (parent_path) REFERENCES files (path)
-      )
-    `);
-
-    // Scans table for tracking scan sessions
-    await this.db.exec(`
-      CREATE TABLE IF NOT EXISTS scans (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        root_path TEXT NOT NULL,
-        scan_timestamp DATETIME NOT NULL,
-        total_size INTEGER NOT NULL,
-        file_count INTEGER NOT NULL,
-        directory_count INTEGER NOT NULL
-      )
-    `);
-
-    // Cache metadata table
-    await this.db.exec(`
-      CREATE TABLE IF NOT EXISTS cache_metadata (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+  getCacheFilePath(rootPath) {
+    // Create a safe filename from the root path
+    const safePath = rootPath.replace(/[<>:"/\\|?*]/g, '_');
+    return path.join(this.cacheDir, `${safePath}.json`);
   }
 
-  async createIndexes() {
-    if (!this.db) throw new Error("Database not initialized");
-
-    // Create indexes for better query performance
-    await this.db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_files_path ON files (path);
-      CREATE INDEX IF NOT EXISTS idx_files_parent_path ON files (parent_path);
-      CREATE INDEX IF NOT EXISTS idx_files_type ON files (type);
-      CREATE INDEX IF NOT EXISTS idx_files_extension ON files (extension);
-      CREATE INDEX IF NOT EXISTS idx_files_size ON files (size);
-      CREATE INDEX IF NOT EXISTS idx_files_modified ON files (modified);
-      CREATE INDEX IF NOT EXISTS idx_scans_root_path ON scans (root_path);
-      CREATE INDEX IF NOT EXISTS idx_scans_timestamp ON scans (scan_timestamp);
-    `);
-  }
-
-  async cacheDirectoryScan(
-    rootPath,
-    files,
-    totalSize,
-    fileCount,
-    directoryCount
-  ) {
-    if (!this.db) throw new Error("Database not initialized");
-
-    const scanTimestamp = new Date();
-
+  async cacheDirectoryScan(rootPath, files, totalSize, fileCount, directoryCount) {
     try {
-      await this.db.run("BEGIN TRANSACTION");
+      const cacheData = {
+        rootPath,
+        files,
+        totalSize,
+        fileCount,
+        directoryCount,
+        timestamp: new Date().toISOString(),
+      };
 
-      // Clear existing data for this root path
-      await this.db.run("DELETE FROM files WHERE path LIKE ?", `${rootPath}%`);
-      await this.db.run("DELETE FROM scans WHERE root_path = ?", rootPath);
-
-      // Insert new scan record
-      await this.db.run(
-        "INSERT INTO scans (root_path, scan_timestamp, total_size, file_count, directory_count) VALUES (?, ?, ?, ?, ?)",
-        [rootPath, scanTimestamp, totalSize, fileCount, directoryCount]
-      );
-
-      // Insert file records
-      for (const file of files) {
-        await this.db.run(
-          "INSERT INTO files (path, name, size, type, extension, modified, created, parent_path, scan_timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-          [
-            file.path,
-            file.name,
-            file.size,
-            file.type,
-            file.extension || null,
-            file.modified,
-            file.created,
-            file.parent_path || null,
-            scanTimestamp,
-          ]
-        );
-      }
-
-      await this.db.run("COMMIT");
+      const cacheFile = this.getCacheFilePath(rootPath);
+      await fs.writeFile(cacheFile, JSON.stringify(cacheData, null, 2));
+      
       console.log(`Cached ${files.length} files for ${rootPath}`);
     } catch (error) {
-      await this.db.run("ROLLBACK");
+      console.error("Error caching directory scan:", error);
       throw error;
     }
   }
 
-  async getCachedScan(rootPath, maxAgeHours = 1) {
-    if (!this.db) throw new Error("Database not initialized");
-
+  async getCachedScan(rootPath, maxAgeHours = 24) {
     try {
-      // Check if we have recent cached data
-      const cutoffTime = new Date(Date.now() - maxAgeHours * 60 * 60 * 1000);
-
-      const scan = await this.db.get(
-        "SELECT * FROM scans WHERE root_path = ? AND scan_timestamp > ? ORDER BY scan_timestamp DESC LIMIT 1",
-        [rootPath, cutoffTime]
-      );
-
-      if (!scan) {
+      const cacheFile = this.getCacheFilePath(rootPath);
+      
+      try {
+        const data = await fs.readFile(cacheFile, 'utf8');
+        const cacheData = JSON.parse(data);
+        
+        // Check if cache is still valid
+        const cacheTime = new Date(cacheData.timestamp);
+        const maxAge = new Date(Date.now() - maxAgeHours * 60 * 60 * 1000);
+        
+        if (cacheTime < maxAge) {
+          return null; // Cache is too old
+        }
+        
+        return cacheData.files;
+      } catch (error) {
+        // Cache file doesn't exist or is corrupted
         return null;
       }
-
-      // Get cached files
-      const files = await this.db.all(
-        "SELECT * FROM files WHERE path LIKE ? AND scan_timestamp = ?",
-        [`${rootPath}%`, scan.scan_timestamp]
-      );
-
-      return files;
     } catch (error) {
       console.error("Error getting cached scan:", error);
       return null;
@@ -171,111 +82,94 @@ class FileSystemCache {
   }
 
   async getFileStats(rootPath) {
-    if (!this.db) throw new Error("Database not initialized");
-
     try {
-      const scan = await this.db.get(
-        "SELECT * FROM scans WHERE root_path = ? ORDER BY scan_timestamp DESC LIMIT 1",
-        [rootPath]
-      );
-
-      if (!scan) {
+      const cacheFile = this.getCacheFilePath(rootPath);
+      
+      try {
+        const data = await fs.readFile(cacheFile, 'utf8');
+        const cacheData = JSON.parse(data);
+        
         return {
-          totalSize: 0,
-          fileCount: 0,
-          directoryCount: 0,
-          lastScan: null,
+          totalSize: cacheData.totalSize || 0,
+          fileCount: cacheData.fileCount || 0,
+          directoryCount: cacheData.directoryCount || 0,
+          lastScan: cacheData.timestamp || null,
         };
+      } catch (error) {
+        return { totalSize: 0, fileCount: 0, directoryCount: 0, lastScan: null };
       }
-
-      return {
-        totalSize: scan.total_size,
-        fileCount: scan.file_count,
-        directoryCount: scan.directory_count,
-        lastScan: new Date(scan.scan_timestamp),
-      };
     } catch (error) {
       console.error("Error getting file stats:", error);
-      return {
-        totalSize: 0,
-        fileCount: 0,
-        directoryCount: 0,
-        lastScan: null,
-      };
+      return { totalSize: 0, fileCount: 0, directoryCount: 0, lastScan: null };
     }
   }
 
   async searchFiles(rootPath, query, filters = {}) {
-    if (!this.db) throw new Error("Database not initialized");
-
     try {
-      let sql = "SELECT * FROM files WHERE path LIKE ?";
-      const params = [`${rootPath}%`];
+      const files = await this.getCachedScan(rootPath);
+      if (!files) return [];
+
+      let filteredFiles = files;
 
       if (query) {
-        sql += " AND (name LIKE ? OR path LIKE ?)";
-        params.push(`%${query}%`, `%${query}%`);
+        filteredFiles = filteredFiles.filter(file => 
+          file.name.toLowerCase().includes(query.toLowerCase())
+        );
+      }
+
+      if (filters.minSize) {
+        filteredFiles = filteredFiles.filter(file => file.size >= filters.minSize);
+      }
+
+      if (filters.maxSize) {
+        filteredFiles = filteredFiles.filter(file => file.size <= filters.maxSize);
       }
 
       if (filters.type) {
-        sql += " AND type = ?";
-        params.push(filters.type);
+        filteredFiles = filteredFiles.filter(file => file.type === filters.type);
       }
 
-      if (filters.minSize !== undefined) {
-        sql += " AND size >= ?";
-        params.push(filters.minSize);
+      if (filters.extension) {
+        filteredFiles = filteredFiles.filter(file => file.extension === filters.extension);
       }
 
-      if (filters.maxSize !== undefined) {
-        sql += " AND size <= ?";
-        params.push(filters.maxSize);
-      }
-
-      if (filters.extensions && filters.extensions.length > 0) {
-        const placeholders = filters.extensions.map(() => "?").join(",");
-        sql += ` AND extension IN (${placeholders})`;
-        params.push(...filters.extensions);
-      }
-
-      sql += " ORDER BY size DESC";
-
-      const files = await this.db.all(sql, params);
-      return files;
+      return filteredFiles.slice(0, 1000); // Limit results
     } catch (error) {
       console.error("Error searching files:", error);
       return [];
     }
   }
 
-  async getLargeFiles(rootPath, minSize = 100 * 1024 * 1024) {
-    if (!this.db) throw new Error("Database not initialized");
-
+  async getLargeFiles(rootPath, minSize) {
     try {
-      const files = await this.db.all(
-        "SELECT * FROM files WHERE path LIKE ? AND type = 'file' AND size >= ? ORDER BY size DESC",
-        [`${rootPath}%`, minSize]
-      );
+      const files = await this.getCachedScan(rootPath);
+      if (!files) return [];
 
-      return files;
+      return files
+        .filter(file => file.type === 'file' && file.size >= minSize)
+        .sort((a, b) => b.size - a.size)
+        .slice(0, 100);
     } catch (error) {
       console.error("Error getting large files:", error);
       return [];
     }
   }
 
-  async getOldFiles(rootPath, daysOld = 30) {
-    if (!this.db) throw new Error("Database not initialized");
-
+  async getOldFiles(rootPath, daysOld) {
     try {
+      const files = await this.getCachedScan(rootPath);
+      if (!files) return [];
+
       const cutoffDate = new Date(Date.now() - daysOld * 24 * 60 * 60 * 1000);
 
-      const files = await this.db.all(
-        "SELECT * FROM files WHERE path LIKE ? AND type = 'file' AND modified < ? ORDER BY modified ASC",
-        [`${rootPath}%`, cutoffDate]
-      );
-
-      return files;
+      return files
+        .filter(file => {
+          if (file.type !== 'file') return false;
+          const modifiedDate = new Date(file.modified);
+          return modifiedDate < cutoffDate;
+        })
+        .sort((a, b) => new Date(a.modified) - new Date(b.modified))
+        .slice(0, 100);
     } catch (error) {
       console.error("Error getting old files:", error);
       return [];
@@ -283,22 +177,29 @@ class FileSystemCache {
   }
 
   async getFileTypeStats(rootPath) {
-    if (!this.db) throw new Error("Database not initialized");
-
     try {
-      const stats = await this.db.all(
-        `SELECT 
-          extension,
-          COUNT(*) as count,
-          SUM(size) as totalSize
-        FROM files 
-        WHERE path LIKE ? AND type = 'file' AND extension IS NOT NULL
-        GROUP BY extension
-        ORDER BY totalSize DESC`,
-        [`${rootPath}%`]
-      );
+      const files = await this.getCachedScan(rootPath);
+      if (!files) return [];
 
-      return stats;
+      const typeStats = {};
+      
+      files.forEach(file => {
+        if (file.type === 'file' && file.extension) {
+          if (!typeStats[file.extension]) {
+            typeStats[file.extension] = {
+              extension: file.extension,
+              count: 0,
+              totalSize: 0
+            };
+          }
+          typeStats[file.extension].count++;
+          typeStats[file.extension].totalSize += file.size;
+        }
+      });
+
+      return Object.values(typeStats)
+        .sort((a, b) => b.totalSize - a.totalSize)
+        .slice(0, 20);
     } catch (error) {
       console.error("Error getting file type stats:", error);
       return [];
@@ -306,24 +207,14 @@ class FileSystemCache {
   }
 
   async clearCache(rootPath) {
-    if (!this.db) throw new Error("Database not initialized");
-
     try {
-      if (rootPath) {
-        // Clear specific root path
-        await this.db.run(
-          "DELETE FROM files WHERE path LIKE ?",
-          `${rootPath}%`
-        );
-        await this.db.run("DELETE FROM scans WHERE root_path = ?", rootPath);
-      } else {
-        // Clear all cache
-        await this.db.run("DELETE FROM files");
-        await this.db.run("DELETE FROM scans");
-        await this.db.run("DELETE FROM cache_metadata");
+      const cacheFile = this.getCacheFilePath(rootPath);
+      try {
+        await fs.unlink(cacheFile);
+        console.log(`Cleared cache for ${rootPath}`);
+      } catch (error) {
+        // File might not exist
       }
-
-      console.log(`Cache cleared for ${rootPath || "all paths"}`);
     } catch (error) {
       console.error("Error clearing cache:", error);
       throw error;
@@ -331,11 +222,9 @@ class FileSystemCache {
   }
 
   async getCacheSize() {
-    if (!this.db) throw new Error("Database not initialized");
-
     try {
-      const result = await this.db.get("SELECT COUNT(*) as count FROM files");
-      return result ? result.count : 0;
+      const files = await fs.readdir(this.cacheDir);
+      return files.length;
     } catch (error) {
       console.error("Error getting cache size:", error);
       return 0;
@@ -343,14 +232,11 @@ class FileSystemCache {
   }
 
   async close() {
-    if (this.db) {
-      await this.db.close();
-      this.db = null;
-    }
+    // No persistent connections to close for file-based cache
   }
 }
 
-// Create and export a singleton instance
+// Create singleton instance
 const fileSystemCache = new FileSystemCache();
 
 module.exports = { fileSystemCache };

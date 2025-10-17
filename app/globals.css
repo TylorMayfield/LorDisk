@@ -1,99 +1,251 @@
+@import url('https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&family=Aller:wght@400;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   html {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    font-family: 'Lato', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
       "Helvetica Neue", Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
   body {
-    @apply bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100;
+    @apply bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    line-height: 1.6;
+  }
+
+  /* Flat UI Typography */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Aller', 'Lato', sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  .font-display {
+    font-family: 'Aller', 'Lato', sans-serif;
+    font-weight: 700;
+  }
+
+  .font-body {
+    font-family: 'Lato', sans-serif;
+    font-weight: 400;
+  }
+
+  /* Theme transition support */
+  .theme-transition * {
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, fill 0.3s ease, stroke 0.3s ease;
+  }
+
+  .theme-transition *::before,
+  .theme-transition *::after {
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, fill 0.3s ease, stroke 0.3s ease;
   }
 }
 
 @layer components {
+  /* Flat UI Button Styles */
   .btn {
-    @apply px-4 py-2.5 rounded-lg font-medium transition-all duration-300 ease-out focus:outline-none focus:ring-2 focus:ring-offset-2;
-    font-size: 13px;
-    letter-spacing: -0.01em;
-    transform: translateZ(0);
+    @apply px-6 py-3 font-body font-medium transition-all duration-200 ease-out focus:outline-none;
+    font-size: 14px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    border: none;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    white-space: nowrap;
   }
 
+  .btn-flat {
+    @apply btn rounded-none;
+  }
+
+  .btn-rounded {
+    @apply btn rounded-md;
+  }
+
+  .btn-square {
+    @apply btn rounded-none;
+  }
+
+  /* Primary Button - Bold and Vibrant */
   .btn-primary {
-    @apply btn bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500 shadow-sm hover:shadow-md;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    @apply btn-flat bg-blue-500 hover:bg-blue-600 text-white;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
   }
 
   .btn-primary:hover {
-    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4);
   }
 
   .btn-primary:active {
-    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(59, 130, 246, 0.3);
   }
 
+  /* Secondary Button - Clean and Minimal */
   .btn-secondary {
-    @apply btn bg-white hover:bg-gray-50 text-gray-700 focus:ring-gray-500 border border-gray-300 shadow-sm hover:shadow-md dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-200 dark:border-gray-600;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    @apply btn-flat bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
 
   .btn-secondary:hover {
-    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
   }
 
-  .btn-secondary:active {
-    transform: translateY(0);
+  /* Success Button - Vibrant Green */
+  .btn-success {
+    @apply btn-flat bg-green-500 hover:bg-green-600 text-white;
+    box-shadow: 0 2px 4px rgba(34, 197, 94, 0.3);
   }
 
+  .btn-success:hover {
+    box-shadow: 0 4px 8px rgba(34, 197, 94, 0.4);
+  }
+
+  /* Warning Button - Bold Orange */
+  .btn-warning {
+    @apply btn-flat bg-orange-500 hover:bg-orange-600 text-white;
+    box-shadow: 0 2px 4px rgba(249, 115, 22, 0.3);
+  }
+
+  .btn-warning:hover {
+    box-shadow: 0 4px 8px rgba(249, 115, 22, 0.4);
+  }
+
+  /* Danger Button - Bold Red */
   .btn-danger {
-    @apply btn bg-red-600 hover:bg-red-700 text-white focus:ring-red-500 shadow-sm hover:shadow-md;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    @apply btn-flat bg-red-500 hover:bg-red-600 text-white;
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
   }
 
   .btn-danger:hover {
-    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(239, 68, 68, 0.4);
   }
 
-  .btn-danger:active {
-    transform: translateY(0);
+  /* Info Button - Vibrant Cyan */
+  .btn-info {
+    @apply btn-flat bg-cyan-500 hover:bg-cyan-600 text-white;
+    box-shadow: 0 2px 4px rgba(6, 182, 212, 0.3);
   }
 
+  .btn-info:hover {
+    box-shadow: 0 4px 8px rgba(6, 182, 212, 0.4);
+  }
+
+  /* Purple Button - Vibrant Purple */
+  .btn-purple {
+    @apply btn-flat bg-purple-500 hover:bg-purple-600 text-white;
+    box-shadow: 0 2px 4px rgba(168, 85, 247, 0.3);
+  }
+
+  .btn-purple:hover {
+    box-shadow: 0 4px 8px rgba(168, 85, 247, 0.4);
+  }
+
+  /* Flat UI Card Styles */
   .card {
-    @apply bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200/60 dark:border-gray-700/60 backdrop-blur-sm;
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    @apply bg-white dark:bg-gray-800;
+    border: 2px solid transparent;
+    transition: all 0.2s ease-out;
   }
 
-  .card-hover {
-    @apply card hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600;
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  .card-flat {
+    @apply card rounded-none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
 
-  .card-hover:hover {
-    transform: translateY(-2px);
+  .card-flat:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   }
 
+  .card-rounded {
+    @apply card rounded-lg;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .card-rounded:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  }
+
+  /* Colored Cards */
+  .card-blue {
+    @apply card-flat bg-blue-50 dark:bg-blue-900/20;
+    border-color: rgba(59, 130, 246, 0.2);
+  }
+
+  .card-green {
+    @apply card-flat bg-green-50 dark:bg-green-900/20;
+    border-color: rgba(34, 197, 94, 0.2);
+  }
+
+  .card-orange {
+    @apply card-flat bg-orange-50 dark:bg-orange-900/20;
+    border-color: rgba(249, 115, 22, 0.2);
+  }
+
+  .card-red {
+    @apply card-flat bg-red-50 dark:bg-red-900/20;
+    border-color: rgba(239, 68, 68, 0.2);
+  }
+
+  .card-purple {
+    @apply card-flat bg-purple-50 dark:bg-purple-900/20;
+    border-color: rgba(168, 85, 247, 0.2);
+  }
+
+  /* Flat UI Input Styles */
   .input {
-    @apply w-full px-3.5 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+    @apply w-full px-4 py-3 font-body bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none;
     font-size: 14px;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 2px solid #e5e7eb;
+    transition: all 0.2s ease-out;
+  }
+
+  .input-flat {
+    @apply input rounded-none;
+  }
+
+  .input-rounded {
+    @apply input rounded-md;
   }
 
   .input:focus {
-    transform: scale(1.01);
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
 
+  .input-flat:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  /* Flat UI Color Variables */
+  :root {
+    --flat-blue: #3498db;
+    --flat-green: #2ecc71;
+    --flat-orange: #e67e22;
+    --flat-red: #e74c3c;
+    --flat-purple: #9b59b6;
+    --flat-cyan: #1abc9c;
+    --flat-yellow: #f1c40f;
+    --flat-gray: #95a5a6;
+    --flat-dark: #2c3e50;
+    --flat-light: #ecf0f1;
+  }
+
+  /* Flat UI Layout Styles */
   .sidebar {
-    @apply w-64 bg-white/80 dark:bg-gray-800/80 border-r border-gray-200/60 dark:border-gray-700/60 backdrop-blur-md;
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    @apply w-64 bg-white dark:bg-gray-800 border-r-2 border-gray-200 dark:border-gray-700;
+    transition: all 0.2s ease-out;
   }
 
   .main-content {
-    @apply flex-1 bg-gray-50/50 dark:bg-gray-900/50 backdrop-blur-sm;
+    @apply flex-1 bg-gray-50 dark:bg-gray-900;
   }
 
   .table-header {

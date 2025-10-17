@@ -8,8 +8,23 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   // Directory scanning
   scanDirectory: (path) => ipcRenderer.invoke("scan-directory", path),
+  scanDirectoryStaggered: (path, options) => ipcRenderer.invoke("scan-directory-staggered", path, options),
   rescanDirectory: (path) => ipcRenderer.invoke("rescan-directory", path),
   getScanProgress: () => ipcRenderer.invoke("get-scan-progress"),
+
+  // Event listeners for staggered scanning
+  onScanProgressUpdate: (callback) => {
+    ipcRenderer.on("scan-progress-update", (event, data) => callback(data));
+  },
+  onImmediateScanResults: (callback) => {
+    ipcRenderer.on("immediate-scan-results", (event, data) => callback(data));
+  },
+  onDirectoryScanUpdate: (callback) => {
+    ipcRenderer.on("directory-scan-update", (event, data) => callback(data));
+  },
+  removeAllListeners: (channel) => {
+    ipcRenderer.removeAllListeners(channel);
+  },
 
   // File operations
   deleteFile: (path) => ipcRenderer.invoke("delete-file", path),

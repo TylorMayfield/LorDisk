@@ -1,5 +1,5 @@
 import "./globals.css";
-import { ThemeProvider } from "./components/ThemeProvider";
+import { ModernThemeProvider } from "./components/ModernThemeProvider";
 
 export const metadata = {
   title: "LorDisk - Disk Space Analyzer & Cleanup Tool",
@@ -24,7 +24,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ModernThemeProvider>{children}</ModernThemeProvider>
       </body>
     </html>
   );

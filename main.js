@@ -20,7 +20,10 @@ function createWindow() {
     },
     icon: path.join(__dirname, "assets", "icon.png"),
     titleBarStyle: "default",
+    frame: true,
     show: false,
+    backgroundColor: '#ffffff',
+    title: 'LorDisk',
   });
 
   // Load the Next.js app
@@ -86,41 +89,75 @@ ipcMain.handle("get-drives", async () => {
     const drives = [];
 
     if (process.platform === "win32") {
-      // Windows: Get drive letters
+      // Windows: Get drive letters with improved error handling
       const { exec } = require("child_process");
       const util = require("util");
       const execAsync = util.promisify(exec);
 
-      const { stdout } = await execAsync(
-        "wmic logicaldisk get size,freespace,caption"
-      );
-      const lines = stdout.trim().split("\n").slice(1);
+      try {
+        // Try PowerShell first (more reliable)
+        const { stdout } = await execAsync(
+          'powershell "Get-WmiObject -Class Win32_LogicalDisk | Select-Object DeviceID,Size,FreeSpace | ConvertTo-Json"'
+        );
+        
+        const driveData = JSON.parse(stdout);
+        if (Array.isArray(driveData)) {
+          driveData.forEach((drive) => {
+            if (drive.DeviceID && drive.Size && drive.FreeSpace) {
+              const totalSize = parseInt(drive.Size);
+              const freeSpace = parseInt(drive.FreeSpace);
+              const usedSpace = totalSize - freeSpace;
 
-      lines.forEach((line) => {
-        const parts = line.trim().split(/\s+/);
-        if (parts.length >= 3) {
-          const drive = parts[0];
-          const freeSpace = parseInt(parts[1]);
-          const totalSize = parseInt(parts[2]);
-
-          if (freeSpace && totalSize) {
-            drives.push({
-              path: drive,
-              name: `${drive} (${formatBytes(totalSize)})`,
-              freeSpace,
-              totalSize,
-              usedSpace: totalSize - freeSpace,
-            });
-          }
+              drives.push({
+                path: drive.DeviceID,
+                name: `${drive.DeviceID} (${formatBytes(totalSize)})`,
+                freeSpace,
+                totalSize,
+                usedSpace,
+                type: "local",
+                filesystem: "NTFS", // Default, could be enhanced to detect actual FS
+              });
+            }
+          });
         }
-      });
-    } else {
-      // macOS and Linux: Get mounted volumes
+      } catch (psError) {
+        console.warn("PowerShell method failed, falling back to WMIC:", psError.message);
+        
+        // Fallback to WMIC
+        const { stdout } = await execAsync(
+          "wmic logicaldisk get size,freespace,caption,volumename /format:csv"
+        );
+        const lines = stdout.trim().split("\n").slice(1);
+
+        lines.forEach((line) => {
+          const parts = line.split(",");
+          if (parts.length >= 4) {
+            const drive = parts[1]?.trim();
+            const freeSpace = parseInt(parts[2]);
+            const totalSize = parseInt(parts[3]);
+            const volumeName = parts[4]?.trim();
+
+            if (drive && freeSpace && totalSize) {
+              drives.push({
+                path: drive,
+                name: volumeName ? `${drive} ${volumeName} (${formatBytes(totalSize)})` : `${drive} (${formatBytes(totalSize)})`,
+                freeSpace,
+                totalSize,
+                usedSpace: totalSize - freeSpace,
+                type: "local",
+                filesystem: "NTFS",
+              });
+            }
+          }
+        });
+      }
+    } else if (process.platform === "darwin") {
+      // macOS: Get mounted volumes with improved parsing
       const { exec } = require("child_process");
       const util = require("util");
       const execAsync = util.promisify(exec);
 
-      if (process.platform === "darwin") {
+      try {
         const { stdout } = await execAsync('df -h | grep -E "^/dev/"');
         const lines = stdout.trim().split("\n");
 
@@ -132,19 +169,32 @@ ipcMain.handle("get-drives", async () => {
             const totalSize = parseSize(parts[1]);
             const usedSize = parseSize(parts[2]);
             const freeSize = parseSize(parts[3]);
+            const filesystem = parts[0];
 
-            if (totalSize > 0) {
+            // Skip system volumes that users typically don't need to analyze
+            if (totalSize > 0 && !mountPoint.includes("/System/") && !mountPoint.includes("/private/var/vm")) {
               drives.push({
                 path: mountPoint,
                 name: `${mountPoint} (${parts[1]})`,
                 freeSpace: freeSize,
                 totalSize,
                 usedSpace: usedSize,
+                type: mountPoint === "/" ? "system" : "local",
+                filesystem: filesystem.replace("/dev/", ""),
               });
             }
           }
         });
-      } else {
+      } catch (error) {
+        console.error("Error getting macOS drives:", error);
+      }
+    } else {
+      // Linux: Get mounted volumes with improved parsing
+      const { exec } = require("child_process");
+      const util = require("util");
+      const execAsync = util.promisify(exec);
+
+      try {
         const { stdout } = await execAsync('df -h | grep -E "^/dev/"');
         const lines = stdout.trim().split("\n");
 
@@ -155,18 +205,34 @@ ipcMain.handle("get-drives", async () => {
             const totalSize = parseSize(parts[1]);
             const usedSize = parseSize(parts[2]);
             const freeSize = parseSize(parts[3]);
+            const filesystem = parts[0];
 
-            drives.push({
-              path: mountPoint,
-              name: `${mountPoint} (${parts[1]})`,
-              freeSpace: freeSize,
-              totalSize,
-              usedSpace: usedSize,
-            });
+            // Skip system volumes and temporary filesystems
+            if (totalSize > 0 && 
+                !mountPoint.includes("/proc") && 
+                !mountPoint.includes("/sys") && 
+                !mountPoint.includes("/dev") &&
+                !mountPoint.includes("/run") &&
+                !mountPoint.includes("/tmp")) {
+              drives.push({
+                path: mountPoint,
+                name: `${mountPoint} (${parts[1]})`,
+                freeSpace: freeSize,
+                totalSize,
+                usedSpace: usedSize,
+                type: mountPoint === "/" ? "system" : "local",
+                filesystem: filesystem.replace("/dev/", ""),
+              });
+            }
           }
         });
+      } catch (error) {
+        console.error("Error getting Linux drives:", error);
       }
     }
+
+    // Sort drives by path for consistent ordering
+    drives.sort((a, b) => a.path.localeCompare(b.path));
 
     return drives;
   } catch (error) {
@@ -261,6 +327,113 @@ ipcMain.handle("scan-directory", async (event, dirPath) => {
         error.message
       );
       stats = await scanDirectory(dirPath);
+    }
+
+    // Update progress when done
+    scanProgress.isScanning = false;
+
+    // Cache the results
+    const fileRecords = stats.items.map((item) => ({
+      path: item.path,
+      name: item.name,
+      size: item.size,
+      type: item.type,
+      extension: item.extension,
+      modified: item.modified,
+      created: item.created,
+      parent_path:
+        path.dirname(item.path) === dirPath ? null : path.dirname(item.path),
+    }));
+
+    await fileSystemCache.cacheDirectoryScan(
+      dirPath,
+      fileRecords,
+      stats.totalSize,
+      stats.items.filter((item) => item.type === "file").length,
+      stats.items.filter((item) => item.type === "directory").length
+    );
+
+    return stats;
+  } catch (error) {
+    console.error("Error scanning directory:", error);
+    throw error;
+  }
+});
+
+ipcMain.handle("scan-directory-staggered", async (event, dirPath, options = {}) => {
+  try {
+    // First, try to get cached data
+    const cachedData = await fileSystemCache.getCachedScan(dirPath, 1); // 1 hour cache
+
+    if (cachedData) {
+      console.log(
+        `Using cached data for ${dirPath} (${cachedData.length} files)`
+      );
+
+      // Reconstruct the directory hierarchy from cached data
+      const itemsMap = new Map();
+      const rootItems = [];
+
+      // First pass: create all items
+      cachedData.forEach((file) => {
+        const item = {
+          name: file.name,
+          path: file.path,
+          size: file.size,
+          type: file.type,
+          extension: file.extension,
+          modified: file.modified,
+          created: file.created,
+          children: [],
+        };
+        itemsMap.set(file.path, item);
+      });
+
+      // Second pass: build hierarchy
+      cachedData.forEach((file) => {
+        const item = itemsMap.get(file.path);
+        if (file.parent_path && file.parent_path !== dirPath) {
+          const parent = itemsMap.get(file.parent_path);
+          if (parent) {
+            parent.children.push(item);
+          }
+        } else {
+          rootItems.push(item);
+        }
+      });
+
+      const totalSize = cachedData.reduce((sum, file) => sum + file.size, 0);
+      return {
+        path: dirPath,
+        items: rootItems,
+        totalSize,
+        itemCount: cachedData.length,
+      };
+    }
+
+    // If no cache, perform staggered scan
+    console.log(`Performing staggered scan for ${dirPath}`);
+
+    // Reset progress
+    scanProgress = {
+      currentDirectory: dirPath,
+      scannedFiles: 0,
+      scannedDirectories: 0,
+      totalItems: 0,
+      isScanning: true,
+      phase: "immediate",
+    };
+
+    // Use staggered scanning for better user experience
+    let stats;
+    try {
+      stats = await scanDirectoryStaggered(dirPath, options);
+    } catch (error) {
+      console.warn(
+        "Staggered scanning failed, falling back to parallel scan:",
+        error.message
+      );
+      stats = await scanDirectoryParallel(dirPath);
     }
 
     // Update progress when done
@@ -491,6 +664,7 @@ ipcMain.handle("get-cache-size", async () => {
   }
 });
 
+
 // Utility functions
 function formatBytes(bytes) {
   if (bytes === 0) return "0 Bytes";
@@ -515,6 +689,82 @@ function parseSize(sizeStr) {
     return Math.round(value * (units[unit] || 1));
   }
   return 0;
+}
+
+// Store active workers for staggered scanning
+const activeWorkers = new Map();
+
+async function scanDirectoryStaggered(dirPath, options = {}) {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(path.join(__dirname, "scanWorker.js"));
+    const workerId = `${dirPath}-${Date.now()}`;
+    
+    activeWorkers.set(workerId, worker);
+
+    worker.on("message", (data) => {
+      if (data.ready) {
+        // Worker is ready, send the scan request
+        worker.postMessage({ 
+          dirPath, 
+          options: {
+            maxDepth: options.maxDepth || 10,
+            immediateDepth: options.immediateDepth || 2,
+            backgroundDepth: options.backgroundDepth || 10,
+            ...options
+          }
+        });
+      } else if (data.type === "progress") {
+        // Update progress from worker
+        scanProgress.currentDirectory = data.currentDirectory;
+        scanProgress.scannedFiles += data.scannedFiles;
+        scanProgress.scannedDirectories += data.scannedDirectories;
+        scanProgress.phase = data.phase || "scanning";
+        
+        // Send progress update to renderer
+        if (mainWindow) {
+          mainWindow.webContents.send("scan-progress-update", scanProgress);
+        }
+      } else if (data.type === "immediate_results") {
+        // Send immediate results to renderer
+        if (mainWindow) {
+          mainWindow.webContents.send("immediate-scan-results", data);
+        }
+      } else if (data.type === "directory_scanned") {
+        // Send background scan results to renderer
+        if (mainWindow) {
+          mainWindow.webContents.send("directory-scan-update", data);
+        }
+      } else if (data.type === "scan_complete") {
+        // Scan completed successfully
+        activeWorkers.delete(workerId);
+        worker.terminate();
+        resolve({
+          path: dirPath,
+          items: data.data.items,
+          totalSize: data.data.totalSize,
+          itemCount: data.data.itemCount,
+        });
+      } else if (data.type === "scan_error") {
+        // Scan failed
+        activeWorkers.delete(workerId);
+        worker.terminate();
+        reject(new Error(data.error));
+      }
+    });
+
+    worker.on("error", (error) => {
+      activeWorkers.delete(workerId);
+      worker.terminate();
+      reject(error);
+    });
+
+    worker.on("exit", (code) => {
+      activeWorkers.delete(workerId);
+      if (code !== 0) {
+        reject(new Error(`Worker stopped with exit code ${code}`));
+      }
+    });
+  });
 }
 
 async function scanDirectoryParallel(dirPath) {

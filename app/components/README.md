@@ -29,7 +29,7 @@ app/components/
 ├── Sidebar.tsx
 ├── Dashboard.tsx
 ├── LoadingSpinner.tsx
-├── ThemeProvider.tsx
+├── ModernThemeProvider.tsx
 └── index.ts         # Component exports
 ```
 
