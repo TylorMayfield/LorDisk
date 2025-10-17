@@ -12,7 +12,7 @@ interface CacheStats {
   totalSize: number;
   fileCount: number;
   directoryCount: number;
-  lastScan: Date | null;
+  lastScan: string | number | Date | null;
 }
 
 export function CacheStatus({ rootPath, onRefresh }: CacheStatusProps) {
@@ -61,9 +61,14 @@ export function CacheStatus({ rootPath, onRefresh }: CacheStatusProps) {
     }
   };
 
-  const formatTimeAgo = (date: Date) => {
+  const formatTimeAgo = (date: string | number | Date | null) => {
+    if (!date) return "Never";
+    
+    const dateObj = new Date(date);
+    if (isNaN(dateObj.getTime())) return "Invalid date";
+    
     const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
+    const diffMs = now.getTime() - dateObj.getTime();
     const diffMins = Math.floor(diffMs / (1000 * 60));
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
