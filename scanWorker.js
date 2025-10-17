@@ -30,6 +30,8 @@ class StaggeredScanner {
     this.scannedPaths = new Set();
     this.batchSize = 50; // Process directories in batches
     this.delayBetweenBatches = 10; // ms delay between batches
+    this.allResults = []; // Store all scanned results
+    this.rootPath = null;
   }
 
   async scanDirectoryStaggered(dirPath, options = {}) {
@@ -43,6 +45,8 @@ class StaggeredScanner {
 
     this.isScanning = true;
     this.scannedPaths.clear();
+    this.allResults = [];
+    this.rootPath = dirPath;
     
     try {
       // Phase 1: Immediate scan of root and immediate children
@@ -60,8 +64,14 @@ class StaggeredScanner {
         await this.scanBackground(dirPath, immediateDepth, backgroundDepth, onProgress, onDirectoryScanned);
       }
 
-      // Final results
-      const finalResults = await this.getFinalResults(dirPath);
+      // Final results - use the immediate results as the base and merge with background results
+      const finalResults = {
+        path: dirPath,
+        items: immediateResults.items || [],
+        totalSize: immediateResults.totalSize || 0,
+        itemCount: immediateResults.itemCount || 0
+      };
+      
       parentPort.postMessage({
         type: "scan_complete",
         data: finalResults,
@@ -81,13 +91,22 @@ class StaggeredScanner {
 
   async scanImmediate(dirPath, maxDepth, onProgress) {
     const results = await this.scanDirectoryRecursive(dirPath, 0, maxDepth, true);
+    const totalSize = results.reduce((sum, item) => sum + (item.size || 0), 0);
+    const itemCount = results.length;
+    
     onProgress({
       phase: "immediate",
       currentPath: dirPath,
       scannedFiles: this.countFiles(results),
       scannedDirectories: this.countDirectories(results)
     });
-    return results;
+    
+    return {
+      path: dirPath,
+      items: results,
+      totalSize,
+      itemCount
+    };
   }
 
   async scanBackground(dirPath, startDepth, maxDepth, onProgress, onDirectoryScanned) {
@@ -327,13 +346,12 @@ class StaggeredScanner {
   }
 
   async getFinalResults(dirPath) {
-    // This would typically involve reconstructing the final tree
-    // For now, return a placeholder
+    // Return the accumulated results
     return {
       path: dirPath,
-      items: [],
-      totalSize: 0,
-      itemCount: 0
+      items: this.allResults,
+      totalSize: this.allResults.reduce((sum, item) => sum + (item.size || 0), 0),
+      itemCount: this.allResults.length
     };
   }
 }
@@ -342,6 +360,7 @@ class StaggeredScanner {
 parentPort.on("message", async (data) => {
   try {
     const { dirPath, options = {} } = data;
+    console.log(`Worker: Starting scan for ${dirPath} with options:`, options);
     const scanner = new StaggeredScanner();
     
     await scanner.scanDirectoryStaggered(dirPath, {
@@ -349,12 +368,14 @@ parentPort.on("message", async (data) => {
       immediateDepth: options.immediateDepth || 2,
       backgroundDepth: options.backgroundDepth || 10,
       onProgress: (progress) => {
+        console.log(`Worker: Progress update:`, progress);
         parentPort.postMessage({
           type: "progress",
           ...progress
         });
       },
       onDirectoryScanned: (result) => {
+        console.log(`Worker: Directory scanned:`, result.path);
         parentPort.postMessage({
           type: "directory_scanned",
           ...result
@@ -362,6 +383,7 @@ parentPort.on("message", async (data) => {
       }
     });
   } catch (error) {
+    console.error(`Worker: Scan error for ${data.dirPath}:`, error);
     parentPort.postMessage({
       type: "scan_error",
       error: error.message
