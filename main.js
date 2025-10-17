@@ -433,7 +433,15 @@ ipcMain.handle("scan-directory-staggered", async (event, dirPath, options = {}) 
         "Staggered scanning failed, falling back to parallel scan:",
         error.message
       );
-      stats = await scanDirectoryParallel(dirPath);
+      try {
+        stats = await scanDirectoryParallel(dirPath);
+      } catch (parallelError) {
+        console.warn(
+          "Parallel scanning failed, falling back to sequential scan:",
+          parallelError.message
+        );
+        stats = await scanDirectory(dirPath);
+      }
     }
 
     // Update progress when done
@@ -773,23 +781,39 @@ async function scanDirectoryParallel(dirPath) {
 
     worker.on("message", (data) => {
       if (data.ready) {
-        // Worker is ready, send the scan request
-        worker.postMessage({ dirPath, maxDepth: 5 });
+        // Worker is ready, send the scan request for parallel scanning
+        worker.postMessage({ 
+          dirPath, 
+          options: { 
+            maxDepth: 5,
+            immediateDepth: 5,
+            backgroundDepth: 5
+          }
+        });
       } else if (data.type === "progress") {
         // Update progress from worker
         scanProgress.currentDirectory = data.currentDirectory;
         scanProgress.scannedFiles += data.scannedFiles;
         scanProgress.scannedDirectories += data.scannedDirectories;
-      } else if (data.success) {
+      } else if (data.type === "immediate_results") {
+        // Use immediate results as final results for parallel scanning
+        worker.terminate();
+        resolve({
+          path: dirPath,
+          items: data.data.items,
+          totalSize: data.data.totalSize,
+          itemCount: data.data.itemCount,
+        });
+      } else if (data.type === "scan_complete") {
         // Scan completed successfully
         worker.terminate();
         resolve({
           path: dirPath,
-          items: data.items,
-          totalSize: data.totalSize,
-          itemCount: data.itemCount,
+          items: data.data.items,
+          totalSize: data.data.totalSize,
+          itemCount: data.data.itemCount,
         });
-      } else {
+      } else if (data.type === "scan_error") {
         // Scan failed
         worker.terminate();
         reject(new Error(data.error));
