@@ -45,7 +45,7 @@
     "concurrently": "^8.0.0",
     "electron": "^28.0.0",
     "electron-builder": "^24.0.0",
-    "eslint": "^9.0.0",
+    "eslint": "^9.38.0",
     "eslint-config-next": "^15.5.4",
     "next": "^15.5.4",
     "playwright": "^1.54.1",
